@@ -8,40 +8,43 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
-@Component
-
+@Component  // Componente Spring, pode ser injetado em outros lugares
 public class JwtUtil {
 
-    private final Key key =
-            Keys.secretKeyFor(SignatureAlgorithm.HS256);
-    private final long expiration = 3600000; // 1hora
+    // Gera uma chave secreta automaticamente para assinar o JWT usando HS256 (simetrico)
+    private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
+    // Tempo de expiração do token (1 hora em milissegundos)
+    private final long expiration = 3600000;
 
+    // Gera um token JWT com o username como "subject"
     public String gerarToken(String username){
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis()+ expiration))
-                .signWith(key)
-                .compact();
+                .setSubject(username)  // Identificador principal do token (username/email)
+                .setIssuedAt(new Date())  // Data de criação do token
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))  // Data de expiração
+                .signWith(key)  // Assina o token com a chave secreta
+                .compact();  // Compacta para String
     }
 
+    // Extrai o username (subject) de dentro do token JWT
     public String extrairUsername(String token){
         return Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(key)  // Usa a mesma chave para verificar assinatura
                 .build()
-                .parseClaimsJws(token)
+                .parseClaimsJws(token)  // Faz o parse e valida o token
                 .getBody()
-                .getSubject();
+                .getSubject();  // Pega o campo "sub"
     }
-    public boolean validarToken(String token){
-        try{
 
+    // Valida se o token é válido (assinatura correta e não expirado)
+    public boolean validarToken(String token){
+        try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
-            return true;
-        }catch (JwtException | IllegalArgumentException e){
-            return false;
+            return true;  // Se não lançar exceção, token válido
+        } catch (JwtException | IllegalArgumentException e){
+            return false;  // Token inválido ou mal formado
         }
     }
-
 }
+
