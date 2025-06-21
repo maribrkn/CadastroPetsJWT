@@ -9,37 +9,68 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration  // Indica que essa classe configura beans do Spring (configurações gerais)
-@RequiredArgsConstructor  // Injeta automaticamente o JwtFilter via construtor
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.CorsConfigurationSource;
+
+import java.util.List;
+
+@Configuration  // Informa ao Spring que esta classe fornece configurações (beans)
+@RequiredArgsConstructor  // Cria construtor com os campos finais (como o jwtFilter)
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter;
+    private final JwtFilter jwtFilter; // Filtro personalizado para validar tokens JWT
 
-    // Método que define a cadeia de filtros e regras de segurança
-    @Bean  // Anota esse método para o Spring chamar e usar o objeto retornado como bean gerenciado
+    @Bean  // Define o bean que configura a segurança HTTP da aplicação
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())  // Desabilita CSRF (cross-site request forgery), útil em APIs REST
-                .headers(headers -> headers.disable())  // Desabilita headers padrão (ex: X-Frame-Options)
+                .csrf(csrf -> csrf.disable()) // Desativa proteção CSRF (necessária apenas em apps com sessões e formulários, não APIs REST)
+                .headers(headers -> headers.disable()) // Desativa alguns headers padrão (opcional)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Ativa CORS com a configuração personalizada
                 .authorizeHttpRequests(auth -> auth
-                        // Permite acesso livre a esses endpoints
-                        .requestMatchers("/auth/login", "/donos/register", "/h2-console/**").permitAll()
-                        // Qualquer outro endpoint exige autenticação
+                        // Libera acesso sem autenticação para endpoints públicos
+                        .requestMatchers("/auth/login", "/donos/register", "/h2-console/**", "/").permitAll()
+                        // Todos os outros endpoints exigem autenticação com token
                         .anyRequest().authenticated()
                 )
-                // Configura para não criar sessão HTTP (stateless), pois usamos JWT
+                // Define que não será criada nenhuma sessão (pois usamos autenticação via token)
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Adiciona o filtro JwtFilter antes do filtro de autenticação padrão
+                // Adiciona o filtro JWT antes do filtro padrão de autenticação por login/senha
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();  // Constroi a cadeia de filtros
+        return http.build(); // Retorna o objeto configurado de segurança
     }
 
-    // Bean que cria um codificador de senha BCrypt para armazenar senhas seguras
+    // Bean que define as regras de CORS
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Define quais origens podem acessar a API (React roda localmente em localhost:3000)
+        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+
+        // Quais métodos HTTP são permitidos
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Quais headers podem ser enviados pelo front
+        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+
+        // Permite ou não envio de credenciais (como cookies, se for o caso)
+        configuration.setAllowCredentials(true);
+
+        // Aplica essa configuração para todas as rotas da API
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source; // Retorna o bean com a configuração de CORS
+    }
+
+    // Bean para codificação segura de senhas com BCrypt
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 }
+
 
 
